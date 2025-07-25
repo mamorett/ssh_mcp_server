@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ssh-mcp-server"
+version = "1.0.0"
+description = "MCP server for executing SSH commands remotely"
+authors = [{name = "Mattia Moretti", email = "hpux@unix.style"}]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "mcp>=0.4.0",
+    "paramiko>=3.0.0",
+    "asyncssh>=2.14.0"
+]
+
+[project.scripts]
+ssh-mcp-server = "ssh_mcp_server.server:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "mypy>=1.0.0",
+    "ruff>=0.1.0"
+]
