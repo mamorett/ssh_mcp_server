@@ -12,7 +12,6 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "mcp>=0.4.0",
-    "paramiko>=3.0.0",
     "asyncssh>=2.14.0"
 ]
 
