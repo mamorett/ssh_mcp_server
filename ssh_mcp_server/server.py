@@ -18,7 +18,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
-logging.basicConfig(level=logging.DEBUG, stream=sys.stderr)
+logging.basicConfig(level=logging.INFO, stream=sys.stderr)
 logger = logging.getLogger(__name__)
 
 # Create server instance
@@ -37,14 +37,11 @@ class SSHConfigParser:
     def _parse_config(self):
         """Parse SSH config file"""
         if not os.path.exists(self.config_path):
-            logger.debug(f"SSH config file not found: {self.config_path}")
             return
         
         try:
             with open(self.config_path, 'r') as f:
                 content = f.read()
-            
-            logger.debug(f"SSH config content length: {len(content)} chars")
             
             lines = content.splitlines()
             current_hosts = []
@@ -67,7 +64,6 @@ class SSHConfigParser:
                             current_hosts.append(host_name)
                             if host_name not in self.hosts:
                                 self.hosts[host_name] = {}
-                    logger.debug(f"Line {line_num}: Found hosts: {current_hosts}")
                 
                 # Handle configuration options
                 elif current_hosts and ' ' in line:
@@ -81,35 +77,22 @@ class SSHConfigParser:
                         if key in ['hostname', 'user', 'port', 'identityfile', 'proxyjump', 'proxycommand']:
                             for host in current_hosts:
                                 self.hosts[host][key] = value
-                            logger.debug(f"Line {line_num}: Set {key}={value} for hosts: {current_hosts}")
-            
-            logger.debug(f"Parsed SSH config with {len(self.hosts)} hosts: {list(self.hosts.keys())}")
-            
-            # Debug: print all parsed hosts
-            for host, config in self.hosts.items():
-                logger.debug(f"Host {host}: {config}")
             
         except Exception as e:
-            logger.error(f"Failed to parse SSH config: {e}", exc_info=True)
+            logger.error(f"Failed to parse SSH config: {e}")
     
     def get_host_config(self, host: str) -> Dict[str, str]:
         """Get configuration for a specific host"""
-        config = self.hosts.get(host, {})
-        logger.debug(f"Config for {host}: {config}")
-        return config
+        return self.hosts.get(host, {})
     
     def is_host_defined(self, host: str) -> bool:
         """Check if host is defined in SSH config"""
-        defined = host in self.hosts
-        logger.debug(f"Host {host} defined in SSH config: {defined}")
-        return defined
+        return host in self.hosts
     
     def has_jump_host(self, host: str) -> bool:
         """Check if host uses a jump host (ProxyJump or ProxyCommand)"""
         config = self.get_host_config(host)
-        has_jump = 'proxyjump' in config or 'proxycommand' in config
-        logger.debug(f"Host {host} has jump host: {has_jump}")
-        return has_jump
+        return 'proxyjump' in config or 'proxycommand' in config
     
     def get_proxy_command(self, host: str) -> Optional[str]:
         """Get ProxyCommand for a host"""
@@ -123,7 +106,6 @@ class SSHConfigParser:
         
         # Replace %h and %p placeholders
         command = proxy_command.replace('%h', target_host).replace('%p', str(target_port))
-        logger.debug(f"ProxyCommand after substitution: {command}")
         
         # Try to parse common ProxyCommand patterns
         # Pattern: ssh user@jumphost nc %h %p
@@ -160,12 +142,10 @@ class SSHConfigParser:
     def get_jump_host_config(self, host: str) -> Optional[Dict[str, Any]]:
         """Get jump host configuration for a host (ProxyJump or ProxyCommand)"""
         config = self.get_host_config(host)
-        logger.debug(f"Getting jump host config for {host}: {config}")
         
         # Handle ProxyJump first (simpler)
         if 'proxyjump' in config:
             jump_spec = config['proxyjump']
-            logger.debug(f"ProxyJump spec: {jump_spec}")
             
             # Parse ProxyJump format: [user@]host[:port]
             if '@' in jump_spec:
@@ -174,65 +154,54 @@ class SSHConfigParser:
                     match = re.match(r'^(.+)@(.+):(\d+)$', jump_spec)
                     if match:
                         jump_user, jump_host, jump_port = match.groups()
-                        result = {
+                        return {
                             'type': 'proxyjump',
                             'host': jump_host,
                             'username': jump_user,
                             'port': int(jump_port)
                         }
-                        logger.debug(f"Parsed ProxyJump (user@host:port): {result}")
-                        return result
                 else:
                     # user@host
                     match = re.match(r'^(.+)@(.+)$', jump_spec)
                     if match:
                         jump_user, jump_host = match.groups()
-                        result = {
+                        return {
                             'type': 'proxyjump',
                             'host': jump_host,
                             'username': jump_user,
                             'port': 22
                         }
-                        logger.debug(f"Parsed ProxyJump (user@host): {result}")
-                        return result
             else:
                 # just host or host:port
                 if ':' in jump_spec:
                     jump_host, jump_port = jump_spec.split(':', 1)
-                    result = {
+                    return {
                         'type': 'proxyjump',
                         'host': jump_host,
                         'username': os.getenv('USER', 'root'),
                         'port': int(jump_port)
                     }
-                    logger.debug(f"Parsed ProxyJump (host:port): {result}")
-                    return result
                 else:
                     # Check if jump_spec is also a host in SSH config
                     if self.is_host_defined(jump_spec):
                         jump_config = self.get_host_config(jump_spec)
-                        result = {
+                        return {
                             'type': 'proxyjump',
                             'host': jump_config.get('hostname', jump_spec),
                             'username': jump_config.get('user', os.getenv('USER', 'root')),
                             'port': int(jump_config.get('port', 22))
                         }
-                        logger.debug(f"Parsed ProxyJump (config host): {result}")
-                        return result
                     else:
-                        result = {
+                        return {
                             'type': 'proxyjump',
                             'host': jump_spec,
                             'username': os.getenv('USER', 'root'),
                             'port': 22
                         }
-                        logger.debug(f"Parsed ProxyJump (host only): {result}")
-                        return result
         
         # Handle ProxyCommand
         if 'proxycommand' in config:
             proxy_command = config['proxycommand']
-            logger.debug(f"ProxyCommand found: {proxy_command}")
             
             # We need the target host and port to parse ProxyCommand properly
             target_host = config.get('hostname', host)
@@ -417,7 +386,6 @@ async def list_tools() -> List[Tool]:
 
 def parse_connection(connection: str) -> Tuple[str, str, int, str]:
     """Parse SSH connection string with SSH config support"""
-    logger.debug(f"Parsing connection: {connection}")
     
     # Check if it's just a hostname (SSH config entry)
     if '@' not in connection and ':' not in connection:
@@ -427,7 +395,6 @@ def parse_connection(connection: str) -> Tuple[str, str, int, str]:
             hostname = host_config.get('hostname', connection)
             username = host_config.get('user', os.getenv('USER', 'root'))
             port = int(host_config.get('port', 22))
-            logger.debug(f"Using SSH config for {connection}: {username}@{hostname}:{port}")
             return username, hostname, port, connection
         else:
             raise ValueError(f"Host '{connection}' not found in SSH config and no user specified. Use user@host format or add to ~/.ssh/config")
@@ -449,13 +416,11 @@ def parse_connection(connection: str) -> Tuple[str, str, int, str]:
     if not (1 <= port <= 65535):
         raise ValueError("Port must be between 1 and 65535")
     
-    logger.debug(f"Parsed connection: {username}@{host}:{port}")
     return username, host, port, connection
 
 def get_ssh_key(private_key_path: str = None, private_key_content: str = None, config_host: str = None):
     """Get SSH private key from path, content, or SSH config"""
     if private_key_content:
-        logger.debug("Using private key from content")
         return asyncssh.import_private_key(private_key_content)
     
     # Check SSH config for identity file
@@ -463,13 +428,11 @@ def get_ssh_key(private_key_path: str = None, private_key_content: str = None, c
         host_config = ssh_config.get_host_config(config_host)
         if 'identityfile' in host_config:
             private_key_path = host_config['identityfile']
-            logger.debug(f"Using identity file from SSH config: {private_key_path}")
     
     if not private_key_path:
         private_key_path = "~/.ssh/id_rsa"
     
     expanded_path = os.path.expanduser(private_key_path)
-    logger.debug(f"Reading private key from: {expanded_path}")
     
     if not os.path.exists(expanded_path):
         raise FileNotFoundError(f"Private key file not found: {expanded_path}")
@@ -482,20 +445,15 @@ def get_ssh_key(private_key_path: str = None, private_key_content: str = None, c
 async def create_ssh_connection(host: str, port: int, username: str, key, connect_timeout: int, original_connection: str):
     """Create SSH connection with ProxyJump and ProxyCommand support"""
     
-    logger.debug(f"Creating SSH connection to {username}@{host}:{port} (original: {original_connection})")
-    
     # Check if this is a config host that needs a jump host
     if ssh_config.is_host_defined(original_connection) and ssh_config.has_jump_host(original_connection):
         jump_config = ssh_config.get_jump_host_config(original_connection)
         
         if jump_config:
-            logger.debug(f"Using jump host for {original_connection}: {jump_config}")
-            
             if jump_config['type'] == 'proxyjump':
                 # Handle ProxyJump - direct SSH tunnel
                 try:
                     # First connect to jump host
-                    logger.debug(f"Connecting to jump host: {jump_config['username']}@{jump_config['host']}:{jump_config['port']}")
                     jump_conn = await asyncssh.connect(
                         host=jump_config['host'],
                         port=jump_config['port'],
@@ -504,10 +462,8 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
                         known_hosts=None,
                         connect_timeout=connect_timeout
                     )
-                    logger.debug("Jump host connection established")
                     
                     # Then connect to target host through jump host
-                    logger.debug(f"Connecting to target host through jump: {username}@{host}:{port}")
                     target_conn = await jump_conn.connect_ssh(
                         host=host,
                         port=port,
@@ -515,7 +471,6 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
                         client_keys=[key],
                         known_hosts=None
                     )
-                    logger.debug("Target host connection established through jump host")
                     
                     return target_conn, jump_conn
                     
@@ -526,8 +481,6 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
             elif jump_config['type'] == 'proxycommand':
                 # Handle ProxyCommand - use asyncssh's tunnel support
                 try:
-                    logger.debug(f"Using ProxyCommand: {jump_config['command']}")
-                    
                     # First connect to the jump host
                     jump_conn = await asyncssh.connect(
                         host=jump_config['host'],
@@ -537,10 +490,8 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
                         known_hosts=None,
                         connect_timeout=connect_timeout
                     )
-                    logger.debug("Jump host connection established for ProxyCommand")
                     
                     # Create tunnel through jump host
-                    logger.debug(f"Creating tunnel to {host}:{port} through jump host")
                     target_conn = await jump_conn.connect_ssh(
                         host=host,
                         port=port,
@@ -548,7 +499,6 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
                         client_keys=[key],
                         known_hosts=None
                     )
-                    logger.debug("Target host connection established through ProxyCommand")
                     
                     return target_conn, jump_conn
                     
@@ -563,7 +513,6 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
                 raise ValueError(f"Complex ProxyCommand not supported: {jump_config['command']}")
     
     # Direct connection (no jump host)
-    logger.debug(f"Direct connection to {username}@{host}:{port}")
     conn = await asyncssh.connect(
         host=host,
         port=port,
@@ -572,7 +521,6 @@ async def create_ssh_connection(host: str, port: int, username: str, key, connec
         known_hosts=None,
         connect_timeout=connect_timeout
     )
-    logger.debug("Direct connection established")
     
     return conn, None
 
@@ -689,7 +637,6 @@ Error: {str(e)}"""
 @server.call_tool()
 async def call_tool(name: str, arguments: Dict[str, Any]):
     """Handle tool calls"""
-    logger.info(f"Tool called: {name} with args: {list(arguments.keys())}")
     
     if name == "ssh_execute":
         return await execute_ssh_command(arguments)
@@ -804,8 +751,6 @@ async def test_ssh_connection(args: Dict[str, Any]):
         connect_timeout = args.get("connect_timeout", 30)
         parallel = args.get("parallel", False)
         
-        logger.info(f"Testing {len(connections)} connection(s)")
-        
         # Get private key (try to use SSH config for the first connection if applicable)
         config_host = connections[0] if len(connections) == 1 and '@' not in connections[0] else None
         key = get_ssh_key(private_key_path, private_key_content, config_host)
@@ -858,8 +803,6 @@ async def execute_ssh_command(args: Dict[str, Any]):
         connect_timeout = args.get("connect_timeout", 30)
         fail_fast = args.get("fail_fast", False)
         parallel = args.get("parallel", False)
-        
-        logger.info(f"Executing command on {len(connections)} server(s)")
         
         # Get private key (try to use SSH config for the first connection if applicable)
         config_host = connections[0] if len(connections) == 1 and '@' not in connections[0] else None
@@ -930,8 +873,6 @@ async def execute_ssh_batch(args: Dict[str, Any]):
         connect_timeout = args.get("connect_timeout", 30)
         parallel = args.get("parallel", True)
         fail_fast = args.get("fail_fast", False)
-        
-        logger.info(f"Executing batch commands on {len(servers)} server(s)")
         
         # Get private key (try to use SSH config for the first server if applicable)
         config_host = servers[0]["connection"] if len(servers) == 1 and '@' not in servers[0]["connection"] else None
@@ -1016,7 +957,6 @@ def main():
 
 async def async_main():
     """Async main entry point"""
-    logger.info("Starting SSH MCP Server with ProxyJump and ProxyCommand support")
     async with stdio_server() as streams:
         await server.run(
             streams[0], streams[1], server.create_initialization_options()
@@ -1024,4 +964,3 @@ async def async_main():
 
 if __name__ == "__main__":
     main()
-
