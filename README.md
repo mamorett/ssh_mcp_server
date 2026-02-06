@@ -28,21 +28,21 @@ This section covers how to install and configure the SSH MCP Server for use with
 Install and run directly from a git repository without cloning:
 
 ```bash
-uvx --git <repository-url> ssh-mcp-server
+uvx git+<repository-url> ssh-mcp-server
 ```
 
 For example, if your repository is at `https://github.com/mamorett/ssh_mcp_server.git`:
 
 ```bash
-uvx --git https://github.com/mamorett/ssh_mcp_server.git ssh-mcp-server
+uvx git+https://github.com/mamorett/ssh_mcp_server.git ssh-mcp-server
 ```
 
 You can also specify a branch, tag, or commit:
 
 ```bash
-uvx --git https://github.com/mamorett/ssh_mcp_server.git@main ssh-mcp-server
-uvx --git https://github.com/mamorett/ssh_mcp_server.git@v1.0.0 ssh-mcp-server
-uvx --git https://github.com/mamorett/ssh_mcp_server.git@abc1234 ssh-mcp-server
+uvx git+https://github.com/mamorett/ssh_mcp_server.git@main ssh-mcp-server
+uvx git+https://github.com/mamorett/ssh_mcp_server.git@v1.0.0 ssh-mcp-server
+uvx git+https://github.com/mamorett/ssh_mcp_server.git@abc1234 ssh-mcp-server
 ```
 
 #### Option 2: Standard Local Installation
