@@ -21,18 +21,48 @@ This section covers how to install and configure the SSH MCP Server for use with
 *   uv package manager
 *   An MCP-compatible client (e.g., Claude Desktop)
 
-### Standard Installation
+### Installation Options
 
-1.  **Install the SSH MCP Server**
+#### Option 1: Using uvx (Recommended)
 
-    Navigate to your project directory and install the server globally using `uv`:
+Install and run directly from a git repository without cloning:
 
-    ```bash
-    cd /path/to/ssh_mcp_server
-    uv tool install .
-    ```
+```bash
+uvx --git <repository-url> ssh-mcp-server
+```
 
-    This makes the `ssh-mcp-server` command available globally on your system.
+For example, if your repository is at `https://github.com/mamorett/ssh_mcp_server.git`:
+
+```bash
+uvx --git https://github.com/mamorett/ssh_mcp_server.git ssh-mcp-server
+```
+
+You can also specify a branch, tag, or commit:
+
+```bash
+uvx --git https://github.com/mamorett/ssh_mcp_server.git@main ssh-mcp-server
+uvx --git https://github.com/mamorett/ssh_mcp_server.git@v1.0.0 ssh-mcp-server
+uvx --git https://github.com/mamorett/ssh_mcp_server.git@abc1234 ssh-mcp-server
+```
+
+#### Option 2: Standard Local Installation
+
+1.  **Clone the Repository**
+
+     ```bash
+     git clone <repository-url>
+     cd ssh_mcp_server
+     ```
+
+2.  **Install the SSH MCP Server**
+
+     Install the server globally using `uv`:
+
+     ```bash
+     uv tool install .
+     ```
+
+     This makes the `ssh-mcp-server` command available globally on your system.
 
 2.  **Configure Your MCP Client**
 
@@ -92,10 +122,15 @@ For those contributing to or modifying the SSH MCP Server:
 
 To verify the installation was successful:
 
-1.  **Check if the command is available:**
-    ```bash
-    uvx ssh-mcp-server --help
-    ```
+ 1.  **Check if the command is available:**
+     ```bash
+     uvx ssh-mcp-server --help
+     ```
+     
+     Or if using git:
+     ```bash
+     uvx --git <repository-url> ssh-mcp-server --help
+     ```
 2.  Check your MCP client's logs for a successful server connection.
 3.  Test the SSH functionality through your MCP client.
 
@@ -104,7 +139,9 @@ To verify the installation was successful:
 **Command Not Found**
 
 If `uvx ssh-mcp-server` returns a "command not found" error:
-*   Ensure you ran `uv tool install .` from the project's root directory.
+
+*   **For git installations**: Ensure the repository URL is correct, accessible, and contains a valid `pyproject.toml` file
+*   **For local installations**: Ensure you ran `uv tool install .` from the project's root directory.
 *   Verify that `uv` is installed correctly and its bin directory is in your system's `PATH`.
 
 **Server Connection Issues**
